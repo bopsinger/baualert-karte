@@ -1,0 +1,30 @@
+name: Daten aktualisieren
+
+on:
+  schedule:
+    # 04:47 UTC, also vor der täglichen E-Mail von baualert
+    - cron: "47 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency: daten
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Baugesuche der letzten 90 Tage holen
+        run: python bauen.py
+      - name: Daten speichern
+        run: |
+          git config user.name "baualert"
+          git config user.email "baualert@users.noreply.github.com"
+          git add daten.json
+          git diff --cached --quiet || git commit -m "Daten aktualisiert"
+          git push

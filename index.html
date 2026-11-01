@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Baualert Karte</title>
+<meta name="description" content="Aktuelle Baugesuche in Basel-Landschaft und im Wallis auf der Karte">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f7d32'/%3E%3Cpath d='M8 24V14l8-6 8 6v10h-5v-6h-6v6z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#f6f7f5;--panel:#fff;--text:#1d211c;--muted:#636b61;--line:#e3e6e1;
+  --accent:#2f7d32;--accent-soft:#e6f2e6;--warn:#d9822b;--warn-soft:#fbeedd;--grey:#9aa198;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}}
+:root[data-theme="dark"]{--bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:grid;grid-template-columns:400px 1fr;grid-template-rows:100%;}
+#seite{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+#karte{min-height:0;height:100%}
+header{padding:16px 16px 10px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+h1 .logo{width:24px;height:24px;border-radius:6px;background:var(--accent);display:grid;place-items:center}
+.stand{color:var(--muted);font-size:12px;margin-top:2px}
+nav.tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid var(--line)}
+nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 4px;border-bottom:2px solid transparent;cursor:pointer}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-color:var(--accent)}
+.bereich{flex:1;overflow:auto;min-height:0}
+.bereich[hidden]{display:none}
+.filter{padding:12px 16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
+.zeile{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+input[type=search],input[type=text],select{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
+select{width:auto}
+.anzahl{font-size:12px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}
+ul.liste{list-style:none;margin:0;padding:0}
+ul.liste li{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+ul.liste li:hover,ul.liste li.aktiv{background:var(--accent-soft)}
+.titel{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.meta{color:var(--muted);font-size:12px;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.badge{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.badge.offen{background:var(--accent-soft);color:var(--accent)}
+.badge.zu{background:var(--line);color:var(--muted)}
+.badge.gebiet{background:var(--warn-soft);color:var(--warn)}
+.mehr{display:block;margin:12px auto;}
+.knopf{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+.knopf.leise{background:none;color:var(--accent)}
+.knopf:disabled{opacity:.5;cursor:default}
+.gebiete{padding:12px 16px;display:grid;gap:12px}
+.karteikarte{border:1px solid var(--line);border-radius:var(--radius);padding:12px;display:grid;gap:8px;box-shadow:var(--shadow)}
+.karteikarte h3{margin:0;font-size:14px}
+.gebiet-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.gebiet-zeile small{color:var(--muted)}
+.x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+.hinweis{color:var(--muted);font-size:12px;margin:0}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;overflow:auto;margin:0;white-space:pre-wrap}
+label.fein{font-size:12px;color:var(--muted);display:grid;gap:4px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.vorschlaege{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.vorschlaege button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
+.vorschlaege button:last-child{border-bottom:0}
+.leaflet-popup-content{font:13px/1.45 system-ui,sans-serif;margin:12px 14px}
+.pop h4{margin:0 0 6px;font-size:14px}
+.pop dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0 0 8px}
+.pop dt{color:#666}.pop dd{margin:0}
+.pop a{color:#2f7d32;font-weight:600;margin-right:10px}
+.modus{position:absolute;z-index:500;left:50%;top:12px;transform:translateX(-50%);background:var(--warn);color:#fff;font-weight:600;padding:6px 12px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+@media (max-width:760px){
+  body{grid-template-columns:100%;grid-template-rows:48vh 1fr}
+  #karte{grid-row:1;height:48vh}
+  #seite{grid-row:2;border-right:0;border-top:1px solid var(--line)}
+  header{padding:10px 16px 6px}
+  h1{font-size:16px}
+}
+</style>
+</head>
+<body>
+<aside id="seite">
+  <header>
+    <h1><span class="logo"><svg width="14" height="14" viewBox="0 0 32 32"><path d="M4 28V13l12-9 12 9v15h-8v-9h-8v9z" fill="#fff"/></svg></span>Baualert</h1>
+    <div class="stand" id="stand">Lade Daten …</div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="liste">Baugesuche</button>
+    <button role="tab" aria-selected="false" data-tab="gebiete">Meine Gebiete</button>
+  </nav>
+
+  <section class="bereich" id="tab-liste">
+    <div class="filter">
+      <input type="search" id="suche" placeholder="Suche: Gemeinde, Vorhaben, Parzelle …">
+      <div class="zeile">
+        <button class="chip" aria-pressed="true" data-kanton="BL">Basel-Landschaft</button>
+        <button class="chip" aria-pressed="true" data-kanton="VS">Wallis</button>
+      </div>
+      <div class="zeile">
+        <button class="chip" aria-pressed="false" id="nurOffen">Auflage läuft</button>
+        <button class="chip" aria-pressed="false" id="nurGebiete">Nur meine Gebiete</button>
+        <select id="zeitraum" aria-label="Zeitraum">
+          <option value="7">7 Tage</option>
+          <option value="30" selected>30 Tage</option>
+          <option value="90">90 Tage</option>
+        </select>
+      </div>
+    </div>
+    <div class="anzahl" id="anzahl"></div>
+    <ul class="liste" id="liste"></ul>
+    <button class="knopf leise mehr" id="mehr" hidden>Weitere anzeigen</button>
+  </section>
+
+  <section class="bereich" id="tab-gebiete" hidden>
+    <div class="gebiete">
+      <div id="gebietListe"></div>
+
+      <div class="karteikarte">
+        <h3>Umkreis um einen Ort</h3>
+        <input type="text" id="adresse" placeholder="Adresse oder Ort suchen …" autocomplete="off">
+        <div class="vorschlaege" id="vorschlaege" hidden></div>
+        <p class="hinweis">Oder auf die Karte tippen, um den Mittelpunkt zu setzen.</p>
+        <label class="fein">Umkreis: <strong id="radiusWert">500 m</strong>
+          <input type="range" id="radius" min="100" max="5000" step="100" value="500"></label>
+        <input type="text" id="kreisName" placeholder="Name, z. B. Zuhause">
+        <button class="knopf" id="kreisSpeichern" disabled>Umkreis speichern</button>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Ganze Gemeinde</h3>
+        <input type="text" id="gemeinde" list="gemeindeListe" placeholder="Gemeinde wählen …">
+        <datalist id="gemeindeListe"></datalist>
+        <button class="knopf" id="gemeindeSpeichern">Gemeinde hinzufügen</button>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Für die tägliche E-Mail übernehmen</h3>
+        <p class="hinweis">Deine Gebiete sind nur in diesem Browser gespeichert. Damit die E-Mail sie kennt, den Text unten kopieren und im privaten Repository in <code>gebiete.toml</code> einfügen.</p>
+        <pre id="toml"></pre>
+        <div class="zeile">
+          <button class="knopf" id="kopieren">Kopieren</button>
+          <a class="knopf leise" href="https://github.com/bopsinger/baualert/edit/main/gebiete.toml" target="_blank" rel="noopener">gebiete.toml öffnen</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</aside>
+<main id="karte"></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+const SPEICHER = "baualert.gebiete.v1";
+const KANTON = { BL: "Basel-Landschaft", VS: "Wallis" };
+const heute = new Date(); heute.setHours(0, 0, 0, 0);
+
+const zustand = {
+  gesuche: [], kantone: new Set(["BL", "VS"]), nurOffen: false, nurGebiete: false,
+  tage: 30, suche: "", sichtbar: 150, aktiv: null,
+  gebiete: laden(),
+};
+
+function laden() { try { return JSON.parse(localStorage.getItem(SPEICHER)) || []; } catch { return []; } }
+function sichern() { try { localStorage.setItem(SPEICHER, JSON.stringify(zustand.gebiete)); } catch {} }
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const datum = (iso) => iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "";
+const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+
+function restTage(f) { if (!f) return null; return Math.round((new Date(f + "T00:00:00") - heute) / 864e5); }
+function fristBadge(g) {
+  const t = restTage(g.f);
+  if (t === null) return "";
+  if (t < 0) return `<span class="badge zu">Auflage beendet</span>`;
+  return `<span class="badge offen">${t === 0 ? "Auflage endet heute" : `noch ${t} Tag${t === 1 ? "" : "e"}`}</span>`;
+}
+function distanz(a, b) {
+  const r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r;
+  const h = Math.sin(dl / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+function gebietVon(g) {
+  for (const z of zustand.gebiete) {
+    if (z.typ === "gemeinde" && norm(z.gemeinde) === norm(g.g)) return z;
+    if (z.typ === "kreis" && g.lat != null && !g.ca && distanz([z.lat, z.lon], [g.lat, g.lon]) <= z.r) return z;
+  }
+  return null;
+}
+
+// ---------- Karte ----------
+const karte = L.map("karte", { preferCanvas: true, zoomControl: true }).setView([46.8, 7.6], 8);
+const swisstopo = (layer, ext) => L.tileLayer(
+  `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`,
+  { maxZoom: 19, maxNativeZoom: 18, attribution: '&copy; <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
+const landeskarte = swisstopo("ch.swisstopo.pixelkarte-farbe", "jpeg").addTo(karte);
+L.control.layers({ "Landeskarte": landeskarte, "Luftbild": swisstopo("ch.swisstopo.swissimage", "jpeg") }, null, { position: "topright" }).addTo(karte);
+const punkte = L.layerGroup().addTo(karte);
+const gebietEbene = L.layerGroup().addTo(karte);
+let entwurf = null; // { lat, lon, kreis }
+
+function farbe(g, inGebiet) {
+  if (inGebiet) return "#d9822b";
+  const t = restTage(g.f);
+  return t !== null && t >= 0 ? "#2f7d32" : "#8f978d";
+}
+function popup(g) {
+  const z = gebietVon(g);
+  const links = [`<a href="https://amtsblattportal.ch/#!/search/publications/detail/${esc(g.id)}" target="_blank" rel="noopener">Amtsblatt</a>`];
+  if (g.u && g.u.startsWith("http")) links.push(`<a href="${esc(g.u)}" target="_blank" rel="noopener">Pläne</a>`);
+  if (g.lat != null) links.push(`<a href="https://map.geo.admin.ch/?swisssearch=${g.lat},${g.lon}&zoom=10" target="_blank" rel="noopener">geo.admin</a>`);
+  return `<div class="pop"><h4>${esc(g.p)}</h4><dl>
+    <dt>Ort</dt><dd>${esc(g.g)}, ${esc(KANTON[g.k] || g.k)}${g.ca ? " <em>(Lage ungefähr)</em>" : ""}</dd>
+    ${g.z ? `<dt>Parzelle</dt><dd>${esc(g.z)}</dd>` : ""}
+    <dt>Publiziert</dt><dd>${datum(g.d)}</dd>
+    ${g.f ? `<dt>Auflage bis</dt><dd>${datum(g.f)} ${fristBadge(g)}</dd>` : ""}
+    ${g.u && !g.u.startsWith("http") ? `<dt>Dossier</dt><dd>${esc(g.u)}</dd>` : ""}
+    ${z ? `<dt>Gebiet</dt><dd>${esc(z.name)}</dd>` : ""}
+    <dt>Nummer</dt><dd>${esc(g.n)}</dd></dl>${links.join("")}</div>`;
+}
+
+// ---------- Filter und Darstellung ----------
+function gefiltert() {
+  const grenze = new Date(heute); grenze.setDate(grenze.getDate() - zustand.tage);
+  const g0 = grenze.toISOString().slice(0, 10);
+  const q = norm(zustand.suche).trim();
+  return zustand.gesuche.filter((g) => {
+    if (!zustand.kantone.has(g.k)) return false;
+    if (g.d < g0) return false;
+    if (zustand.nurOffen) { const t = restTage(g.f); if (t === null || t < 0) return false; }
+    if (zustand.nurGebiete && !gebietVon(g)) return false;
+    if (q && !norm(`${g.p} ${g.g} ${g.z} ${g.n}`).includes(q)) return false;
+    return true;
+  });
+}
+
+const marker = new Map();
+function zeichnen(passend = false) {
+  const liste = gefiltert();
+  punkte.clearLayers(); marker.clear();
+  for (const g of liste) {
+    if (g.lat == null) continue;
+    const z = !!gebietVon(g);
+    const m = L.circleMarker([g.lat, g.lon], {
+      radius: z ? 8 : 6, weight: z ? 3 : 1.5, color: "#fff", fillColor: farbe(g, z), fillOpacity: .9,
+      dashArray: g.ca ? "3 3" : null,
+    }).bindPopup(() => popup(g), { maxWidth: 320 });
+    m.on("click", () => markieren(g.id, false));
+    m.addTo(punkte); marker.set(g.id, m);
+  }
+  const offen = liste.filter((g) => { const t = restTage(g.f); return t !== null && t >= 0; }).length;
+  const imGebiet = liste.filter(gebietVon).length;
+  $("anzahl").textContent = `${liste.length} Baugesuche · ${offen} mit laufender Auflage` + (zustand.gebiete.length ? ` · ${imGebiet} in deinen Gebieten` : "");
+  const ul = $("liste"); ul.innerHTML = "";
+  for (const g of liste.slice(0, zustand.sichtbar)) {
+    const li = document.createElement("li");
+    li.dataset.id = g.id;
+    if (g.id === zustand.aktiv) li.className = "aktiv";
+    const z = gebietVon(g);
+    li.innerHTML = `<div class="titel">${esc(g.p)}</div>
+      <div class="meta"><span>${esc(g.g)} · ${g.k}</span><span>publiziert ${datum(g.d)}</span>${fristBadge(g)}${z ? `<span class="badge gebiet">${esc(z.name)}</span>` : ""}</div>`;
+    li.addEventListener("click", () => markieren(g.id, true));
+    ul.appendChild(li);
+  }
+  $("mehr").hidden = liste.length <= zustand.sichtbar;
+  if (passend) {
+    const b = L.latLngBounds(liste.filter((g) => g.lat != null).map((g) => [g.lat, g.lon]));
+    if (b.isValid()) karte.fitBounds(b, { padding: [30, 30], maxZoom: 14 });
+  }
+}
+function markieren(id, fliegen) {
+  zustand.aktiv = id;
+  document.querySelectorAll("#liste li").forEach((li) => li.classList.toggle("aktiv", li.dataset.id === id));
+  const m = marker.get(id);
+  if (m && fliegen) { karte.flyTo(m.getLatLng(), Math.max(karte.getZoom(), 15), { duration: .6 }); m.openPopup(); }
+  const li = document.querySelector(`#liste li[data-id="${CSS.escape(id)}"]`);
+  if (li && !fliegen) li.scrollIntoView({ block: "nearest" });
+}
+
+// ---------- Gebiete ----------
+function gebieteZeichnen() {
+  gebietEbene.clearLayers();
+  for (const z of zustand.gebiete) {
+    if (z.typ === "kreis") L.circle([z.lat, z.lon], { radius: z.r, color: "#d9822b", weight: 2, fillOpacity: .08 }).bindTooltip(z.name).addTo(gebietEbene);
+  }
+  if (entwurf) entwurf.kreis.addTo(gebietEbene);
+  const box = $("gebietListe");
+  box.innerHTML = zustand.gebiete.length ? "" : `<p class="hinweis">Noch keine Gebiete. Lege unten einen Umkreis oder eine Gemeinde an.</p>`;
+  for (const z of zustand.gebiete) {
+    const d = document.createElement("div");
+    d.className = "gebiet-zeile karteikarte";
+    d.innerHTML = `<div><strong>${esc(z.name)}</strong><br><small>${z.typ === "kreis" ? `Umkreis ${z.r} m` : `Gemeinde ${esc(z.gemeinde)}`}</small></div>`;
+    const zeig = document.createElement("button"); zeig.className = "knopf leise"; zeig.textContent = "Zeigen";
+    zeig.onclick = () => z.typ === "kreis" ? karte.flyTo([z.lat, z.lon], 15) : suchenNach(z.gemeinde);
+    const x = document.createElement("button"); x.className = "x"; x.title = "Entfernen"; x.textContent = "×";
+    x.onclick = () => { zustand.gebiete = zustand.gebiete.filter((y) => y !== z); sichern(); allesNeu(); };
+    const r = document.createElement("div"); r.className = "zeile"; r.append(zeig, x); d.append(r);
+    box.appendChild(d);
+  }
+  $("toml").textContent = toml();
+}
+function toml() {
+  if (!zustand.gebiete.length) return "# Noch keine Gebiete angelegt";
+  const q = (s) => JSON.stringify(s);
+  return zustand.gebiete.map((z) => z.typ === "kreis"
+    ? `[[gebiet]]\nname = ${q(z.name)}\nlat = ${z.lat.toFixed(6)}\nlon = ${z.lon.toFixed(6)}\nradius_m = ${z.r}\n`
+    : `[[gebiet]]\nname = ${q(z.name)}\ngemeinden = [${q(z.gemeinde)}]\n`).join("\n");
+}
+function allesNeu() { gebieteZeichnen(); zeichnen(); }
+function suchenNach(text) { $("suche").value = text; zustand.suche = text; tab("liste"); zeichnen(true); }
+
+function entwurfSetzen(lat, lon) {
+  const r = +$("radius").value;
+  if (entwurf) { entwurf.lat = lat; entwurf.lon = lon; entwurf.kreis.setLatLng([lat, lon]); }
+  else entwurf = { lat, lon, kreis: L.circle([lat, lon], { radius: r, color: "#d9822b", dashArray: "6 6", weight: 2, fillOpacity: .12 }) };
+  gebieteZeichnen();
+  $("kreisSpeichern").disabled = false;
+  karte.fitBounds(entwurf.kreis.getBounds(), { padding: [40, 40] });
+}
+karte.on("click", (e) => { if (aktuellerTab === "gebiete") entwurfSetzen(e.latlng.lat, e.latlng.lng); });
+$("radius").addEventListener("input", () => {
+  $("radiusWert").textContent = `${(+$("radius").value).toLocaleString("de-CH")} m`;
+  if (entwurf) entwurf.kreis.setRadius(+$("radius").value);
+});
+$("kreisSpeichern").onclick = () => {
+  if (!entwurf) return;
+  zustand.gebiete.push({ typ: "kreis", name: $("kreisName").value.trim() || `Umkreis ${zustand.gebiete.length + 1}`,
+    lat: +entwurf.lat.toFixed(6), lon: +entwurf.lon.toFixed(6), r: +$("radius").value });
+  entwurf = null; $("kreisName").value = ""; $("adresse").value = ""; $("kreisSpeichern").disabled = true;
+  sichern(); allesNeu();
+};
+$("gemeindeSpeichern").onclick = () => {
+  const name = $("gemeinde").value.trim();
+  if (!name) return;
+  const bekannt = [...new Set(zustand.gesuche.map((g) => g.g))].find((x) => norm(x) === norm(name)) || name;
+  zustand.gebiete.push({ typ: "gemeinde", name: bekannt, gemeinde: bekannt });
+  $("gemeinde").value = ""; sichern(); allesNeu();
+};
+$("kopieren").onclick = async () => {
+  try { await navigator.clipboard.writeText(toml()); $("kopieren").textContent = "Kopiert"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("toml")); getSelection().removeAllRanges(); getSelection().addRange(r); $("kopieren").textContent = "Markiert, bitte kopieren"; }
+  setTimeout(() => ($("kopieren").textContent = "Kopieren"), 2000);
+};
+
+// Adresssuche über geo.admin.ch
+let suchTimer;
+$("adresse").addEventListener("input", () => {
+  clearTimeout(suchTimer);
+  const q = $("adresse").value.trim();
+  if (q.length < 3) { $("vorschlaege").hidden = true; return; }
+  suchTimer = setTimeout(async () => {
+    try {
+      const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&sr=4326&limit=6&searchText=${encodeURIComponent(q)}`;
+      const t = (await (await fetch(u)).json()).results || [];
+      const box = $("vorschlaege"); box.innerHTML = "";
+      for (const r of t) {
+        const b = document.createElement("button");
+        b.innerHTML = r.attrs.label; // vom Bund geliefert, enthält nur <b>
+        b.textContent = b.textContent;
+        b.onclick = () => { $("adresse").value = b.textContent; box.hidden = true; entwurfSetzen(r.attrs.lat, r.attrs.lon);
+          if (!$("kreisName").value) $("kreisName").value = b.textContent.split(" ").slice(0, 3).join(" "); };
+        box.appendChild(b);
+      }
+      box.hidden = !t.length;
+    } catch { $("vorschlaege").hidden = true; }
+  }, 250);
+});
+
+// ---------- Bedienelemente ----------
+let aktuellerTab = "liste";
+function tab(name) {
+  aktuellerTab = name;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name));
+  $("tab-liste").hidden = name !== "liste"; $("tab-gebiete").hidden = name !== "gebiete";
+  karte.getContainer().style.cursor = name === "gebiete" ? "crosshair" : "";
+}
+document.querySelectorAll("nav.tabs button").forEach((b) => b.onclick = () => tab(b.dataset.tab));
+document.querySelectorAll("[data-kanton]").forEach((b) => b.onclick = () => {
+  const k = b.dataset.kanton;
+  zustand.kantone.has(k) ? zustand.kantone.delete(k) : zustand.kantone.add(k);
+  b.setAttribute("aria-pressed", zustand.kantone.has(k)); zustand.sichtbar = 150; zeichnen(true);
+});
+for (const [id, feld] of [["nurOffen", "nurOffen"], ["nurGebiete", "nurGebiete"]]) {
+  $(id).onclick = () => { zustand[feld] = !zustand[feld]; $(id).setAttribute("aria-pressed", zustand[feld]); zustand.sichtbar = 150; zeichnen(true); };
+}
+$("zeitraum").onchange = () => { zustand.tage = +$("zeitraum").value; zustand.sichtbar = 150; zeichnen(true); };
+let tippTimer;
+$("suche").addEventListener("input", () => { clearTimeout(tippTimer); tippTimer = setTimeout(() => { zustand.suche = $("suche").value; zustand.sichtbar = 150; zeichnen(true); }, 200); });
+$("mehr").onclick = () => { zustand.sichtbar += 150; zeichnen(); };
+
+// ---------- Start ----------
+fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+  zustand.gesuche = d.gesuche;
+  const s = new Date(d.stand);
+  $("stand").textContent = `Basel-Landschaft und Wallis · Stand ${s.toLocaleDateString("de-CH")} ${s.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
+  $("gemeindeListe").innerHTML = [...new Set(d.gesuche.map((g) => g.g).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"))
+    .map((g) => `<option value="${esc(g)}">`).join("");
+  gebieteZeichnen(); zeichnen(true);
+}).catch(() => { $("stand").textContent = "Daten konnten nicht geladen werden."; });
+</script>
+</body>
+</html>
