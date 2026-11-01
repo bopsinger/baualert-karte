@@ -139,7 +139,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
       <div class="karteikarte">
         <h3>Für die tägliche E-Mail übernehmen</h3>
-        <p class="hinweis">Deine Gebiete sind nur in diesem Browser gespeichert. Damit die E-Mail sie kennt, den Text unten kopieren und im privaten Repository in <code>gebiete.toml</code> einfügen.</p>
+        <p class="hinweis">Deine Gebiete sind nur in diesem Browser gespeichert. Damit die E-Mail sie kennt: <b>Kopieren</b> drücken, <b>gebiete.toml öffnen</b>, dort im Textfeld alles markieren (Ctrl+A bzw. ⌘A), einfügen (Ctrl+V bzw. ⌘V) und oben rechts <b>Commit changes</b> bestätigen.</p>
         <pre id="toml"></pre>
         <div class="zeile">
           <button class="knopf" id="kopieren">Kopieren</button>
@@ -306,7 +306,8 @@ function gebieteZeichnen() {
 function toml() {
   if (!zustand.gebiete.length) return "# Noch keine Gebiete angelegt";
   const q = (s) => JSON.stringify(s);
-  return zustand.gebiete.map((z) => z.typ === "kreis"
+  const kopf = `# Erstellt mit der Baualert-Karte am ${new Date().toLocaleDateString("de-CH")}.\n# Ganzen Inhalt dieser Datei ersetzen, nicht ergänzen.\n\n`;
+  return kopf + zustand.gebiete.map((z) => z.typ === "kreis"
     ? `[[gebiet]]\nname = ${q(z.name)}\nlat = ${z.lat.toFixed(6)}\nlon = ${z.lon.toFixed(6)}\nradius_m = ${z.r}\n`
     : `[[gebiet]]\nname = ${q(z.name)}\ngemeinden = [${q(z.gemeinde)}]\n`).join("\n");
 }
