@@ -139,12 +139,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
       <div class="karteikarte">
         <h3>Für die tägliche E-Mail übernehmen</h3>
-        <p class="hinweis">Deine Gebiete sind nur in diesem Browser gespeichert. Damit die E-Mail sie kennt: <b>Kopieren</b> drücken, <b>gebiete.toml öffnen</b>, dort im Textfeld alles markieren (Ctrl+A bzw. ⌘A), einfügen (Ctrl+V bzw. ⌘V) und oben rechts <b>Commit changes</b> bestätigen.</p>
-        <pre id="toml"></pre>
-        <div class="zeile">
-          <button class="knopf" id="kopieren">Kopieren</button>
-          <a class="knopf leise" href="https://github.com/bopsinger/baualert/edit/main/gebiete.toml" target="_blank" rel="noopener">gebiete.toml öffnen</a>
-        </div>
+        <p class="hinweis">Deine Gebiete sind nur in diesem Browser gespeichert. Ein Klick öffnet GitHub mit allem fertig ausgefüllt; dort nur noch oben rechts <b>Commit changes</b> und nochmals <b>Commit changes</b> drücken. Kurz darauf kommt eine E-Mail mit allen laufenden Baugesuchen in deinen Gebieten.</p>
+        <button class="knopf" id="uebernehmen">Gebiete übernehmen</button>
+        <details><summary class="hinweis">Inhalt anzeigen</summary><pre id="toml"></pre>
+          <button class="knopf leise" id="kopieren" style="margin-top:8px">Kopieren</button></details>
       </div>
     </div>
   </section>
@@ -306,7 +304,7 @@ function gebieteZeichnen() {
 function toml() {
   if (!zustand.gebiete.length) return "# Noch keine Gebiete angelegt";
   const q = (s) => JSON.stringify(s);
-  const kopf = `# Erstellt mit der Baualert-Karte am ${new Date().toLocaleDateString("de-CH")}.\n# Ganzen Inhalt dieser Datei ersetzen, nicht ergänzen.\n\n`;
+  const kopf = `# Erstellt mit der Baualert-Karte am ${new Date().toLocaleDateString("de-CH")}.\n# Es gilt immer die neueste Datei im Ordner gebiete/.\n\n`;
   return kopf + zustand.gebiete.map((z) => z.typ === "kreis"
     ? `[[gebiet]]\nname = ${q(z.name)}\nlat = ${z.lat.toFixed(6)}\nlon = ${z.lon.toFixed(6)}\nradius_m = ${z.r}\n`
     : `[[gebiet]]\nname = ${q(z.name)}\ngemeinden = [${q(z.gemeinde)}]\n`).join("\n");
@@ -340,6 +338,14 @@ $("gemeindeSpeichern").onclick = () => {
   const bekannt = [...new Set(zustand.gesuche.map((g) => g.g))].find((x) => norm(x) === norm(name)) || name;
   zustand.gebiete.push({ typ: "gemeinde", name: bekannt, gemeinde: bekannt });
   $("gemeinde").value = ""; sichern(); allesNeu();
+};
+$("uebernehmen").onclick = () => {
+  if (!zustand.gebiete.length) { alert("Bitte zuerst mindestens ein Gebiet anlegen."); return; }
+  const z = new Date(), n = (x) => String(x).padStart(2, "0");
+  const name = `gebiete/${z.getFullYear()}-${n(z.getMonth() + 1)}-${n(z.getDate())}_${n(z.getHours())}${n(z.getMinutes())}${n(z.getSeconds())}.toml`;
+  const url = `https://github.com/bopsinger/baualert/new/main?filename=${encodeURIComponent(name)}`
+    + `&value=${encodeURIComponent(toml())}&message=${encodeURIComponent("Gebiete von der Karte übernommen")}`;
+  window.open(url, "_blank", "noopener");
 };
 $("kopieren").onclick = async () => {
   try { await navigator.clipboard.writeText(toml()); $("kopieren").textContent = "Kopiert"; }
