@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -49,16 +50,21 @@ class Gesuch:
         return DETAIL_URL.format(id=self.id)
 
 
-def _get(url: str, accept: str, versuche: int = 3) -> bytes:
-    for i in range(versuche):
+WARTEZEITEN = (10, 30, 60, 120, 300)   # Sekunden zwischen den Versuchen, total gut 8 Minuten
+
+
+def _get(url: str, accept: str) -> bytes:
+    """Holt eine Adresse; das Amtsblattportal ist zeitweise langsam, darum geduldig wiederholen."""
+    for i in range(len(WARTEZEITEN) + 1):
         try:
             req = urllib.request.Request(url, headers=dict(KOPF, Accept=accept))
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=60) as r:
                 return r.read()
-        except Exception:
-            if i == versuche - 1:
+        except Exception as e:
+            if i == len(WARTEZEITEN):
                 raise
-            time.sleep(2 ** (i + 1))
+            print(f"Versuch {i + 1} fehlgeschlagen ({e}), neuer Versuch in {WARTEZEITEN[i]} s", file=sys.stderr)
+            time.sleep(WARTEZEITEN[i])
     raise RuntimeError("unerreichbar")
 
 

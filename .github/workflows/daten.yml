@@ -4,6 +4,8 @@ on:
   schedule:
     # 04:47 UTC, also vor der täglichen E-Mail von baualert
     - cron: "47 4 * * *"
+    # Zweiter Lauf als Rückfallebene, falls das Amtsblattportal beim ersten nicht antwortet
+    - cron: "23 17 * * *"
   workflow_dispatch: {}
 
 permissions:
